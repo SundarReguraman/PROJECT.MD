@@ -27,10 +27,20 @@ VERDICT_TEXT = {
     Verdict.REVIEW: "REVIEW  resolve the warnings above before building those parts",
     Verdict.BLOCK: "BLOCK   the idea names a known dead end; the files mandate the replacement",
 }
-BANNER_WIDTH = 62
+
+LOGO_WIDTH = 34  # Characters between the page's left and right edges.
+LOGO_TITLE = "P R O J E C T . M D"
+LOGO_FEATURES = (
+    "Zero-Prerequisite Engine",
+    "Pre-Flight Tech Audit",
+    "5-Agent Architecture",
+    "Universal Context Exporter",
+)
+TAGLINE = "Build the right thing before you build it wrong."
 
 # ANSI colours, applied only when writing to a capable terminal.
-RED, YELLOW, GREEN, DIM, BOLD, RESET = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[1m", "\033[0m"
+RED, YELLOW, GREEN, CYAN, WHITE = "\033[31m", "\033[33m", "\033[32m", "\033[36m", "\033[97m"
+DIM, BOLD, RESET = "\033[2m", "\033[1m", "\033[0m"
 SEVERITY_COLORS = {Severity.CRITICAL: RED, Severity.WARNING: YELLOW, Severity.INFO: DIM}
 VERDICT_COLORS = {Verdict.PASS: GREEN, Verdict.REVIEW: YELLOW, Verdict.BLOCK: RED}
 
@@ -103,10 +113,20 @@ class Printer:
         print(text, file=self.out)
 
     def banner(self) -> None:
-        inner = BANNER_WIDTH - 2
-        self.line("+" + "-" * inner + "+")
-        self.line("|" + "PROJECT.MD  Architecture Pre-Flight".center(inner) + "|", BOLD)
-        self.line("+" + "-" * inner + "+")
+        for row in logo_rows(tick="\u2713" if self._can_print("\u2713") else "x", color=self.color):
+            self.line(row, CYAN)
+        self.line()
+        self.line(f" {TAGLINE}", BOLD)
+        self.line()
+
+    def _can_print(self, text: str) -> bool:
+        # Legacy Windows consoles (cp1252 etc.) raise UnicodeEncodeError on symbols like the tick.
+        encoding = getattr(self.out, "encoding", None) or "utf-8"
+        try:
+            text.encode(encoding)
+            return True
+        except (UnicodeEncodeError, LookupError):
+            return False
 
     def findings(self, report: PreflightReport) -> None:
         by_agent = {name: [] for name in AGENT_ORDER}
@@ -146,6 +166,32 @@ class Printer:
         if written:
             self.line()
             self.line("Open your AI assistant in this folder and start building. PROJECT.md is the source of truth.")
+
+
+def logo_rows(tick: str = "\u2713", color: bool = False) -> List[str]:
+    """The folded-page logo, one string per row. Widths are computed, so edges always line up."""
+    w = LOGO_WIDTH
+
+    def accent(text: str, style: str) -> str:
+        # Rows are printed in CYAN; switch style for the text, then restore CYAN.
+        return f"{style}{text}{RESET}{CYAN}" if color else text
+
+    rows = [
+        "       ." + "-" * w + ".",
+        "      /" + " " * w + "/|",
+        "     /" + accent(LOGO_TITLE.center(w), BOLD + WHITE) + "/ |",
+        "    /" + "_" * w + "/  |",
+        "    |" + " " * w + "|  |",
+    ]
+    right_edges = ["|  |"] * (len(LOGO_FEATURES) - 1) + ["|  /"]
+    for feature, edge in zip(LOGO_FEATURES, right_edges):
+        text = f"  [{tick}] {feature}"
+        rows.append("    |" + accent(text, GREEN) + " " * (w - len(text)) + edge)
+    rows += [
+        "    |" + " " * w + "| /",
+        "    |" + "_" * w + "|/",
+    ]
+    return rows
 
 
 def _parse_targets(raw: Optional[str]) -> List[ContextTarget]:

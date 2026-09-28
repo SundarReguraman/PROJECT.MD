@@ -54,7 +54,8 @@ class CliSubprocessTest(unittest.TestCase):
     def test_output_shows_banner_agents_score_and_verdict(self):
         with tempfile.TemporaryDirectory() as tmp:
             stdout = self.run_cli(HANDWRITING, "--out", tmp).stdout
-        self.assertIn("PROJECT.MD  Architecture Pre-Flight", stdout)
+        self.assertIn("P R O J E C T . M D", stdout)
+        self.assertIn(cli.TAGLINE, stdout)
         for agent in cli.AGENT_ORDER:
             self.assertIn(f"[{agent}]", stdout)
         self.assertRegex(stdout, r"Risk score: \d+/100")
@@ -67,6 +68,30 @@ class CliSubprocessTest(unittest.TestCase):
             self.assertEqual(result.returncode, cli.EXIT_BLOCK)
             self.assertIn("Verdict:    BLOCK", result.stdout)
             self.assertTrue((Path(tmp) / "PROJECT.md").is_file())
+
+
+class LogoTest(unittest.TestCase):
+    def test_page_edges_line_up(self):
+        rows = cli.logo_rows()
+        left, right = 4, 4 + cli.LOGO_WIDTH + 1
+        for row in rows[4:]:  # Front face of the page.
+            with self.subTest(row=row):
+                self.assertEqual(row[left], "|")
+                self.assertEqual(row[right], "|")
+        # The back edge is a straight vertical line until the bottom corner slants in.
+        self.assertEqual({len(row) for row in rows[:-2]}, {len(rows[0])})
+
+    def test_features_fit_on_the_page(self):
+        for feature in cli.LOGO_FEATURES:
+            self.assertLessEqual(len(f"  [x] {feature}"), cli.LOGO_WIDTH)
+
+    def test_legacy_windows_console_falls_back_to_ascii_tick(self):
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        cli.Printer(stream, color=False).banner()  # Must not raise UnicodeEncodeError.
+        stream.flush()
+        text = stream.buffer.getvalue().decode("cp1252")
+        self.assertIn("[x] Pre-Flight Tech Audit", text)
+        self.assertNotIn("\u2713", text)
 
 
 class CliBehaviourTest(unittest.TestCase):
