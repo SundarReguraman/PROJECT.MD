@@ -91,7 +91,6 @@ def main(argv: Optional[List[str]] = None, stdout: Optional[TextIO] = None) -> i
     ui.line(f"Idea: {idea}")
     ui.line(f"Running {len(AGENT_ORDER)} specialist agents in parallel...", DIM)
     report = Orchestrator().run_sync(idea).report
-    report.targets = targets
 
     ui.findings(report)
     ui.verdict(report)

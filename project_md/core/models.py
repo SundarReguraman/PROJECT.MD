@@ -51,7 +51,6 @@ class Constraint(str, Enum):
     """Non-functional constraints inferred from the idea text."""
 
     OFFLINE = "offline"
-    LOW_BUDGET = "low_budget"
     LOW_LATENCY = "low_latency"
     PRIVACY_SENSITIVE = "privacy_sensitive"
     HIGH_SCALE = "high_scale"
@@ -75,7 +74,6 @@ class ContextTarget(str, Enum):
     GEMINI = "gemini"
     AGENTS = "agents"
     CURSOR = "cursor"
-    COPILOT = "copilot"
 
     @property
     def filename(self) -> str:
@@ -85,7 +83,6 @@ class ContextTarget(str, Enum):
             "gemini": "GEMINI.md",
             "agents": "AGENTS.md",
             "cursor": ".cursorrules",
-            "copilot": ".github/copilot-instructions.md",
         }[self.value]
 
 
@@ -252,7 +249,6 @@ class PreflightReport:
     stack: TechStack
     warnings: List[TrapWarning] = field(default_factory=list)
     layers: List[ArchitectureLayer] = field(default_factory=list)
-    targets: List[ContextTarget] = field(default_factory=lambda: list(ContextTarget))
     findings: List[Finding] = field(default_factory=list)
     data_models: List[DataModel] = field(default_factory=list)
     endpoints: List[ApiEndpoint] = field(default_factory=list)
@@ -262,10 +258,6 @@ class PreflightReport:
     @property
     def has_critical(self) -> bool:
         return any(w.severity is Severity.CRITICAL for w in self.warnings)
-
-    def sorted_warnings(self) -> List[TrapWarning]:
-        """Warnings ordered most severe first, then by trap id for stable output."""
-        return sorted(self.warnings, key=lambda w: (w.severity.rank, w.trap.id))
 
     def to_dict(self) -> Dict[str, Any]:
         """JSON-safe dict (enums become their string values)."""
