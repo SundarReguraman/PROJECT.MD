@@ -13,8 +13,8 @@ from project_md.core.models import (
 
 
 class KnowledgeBaseIntegrityTest(unittest.TestCase):
-    def test_has_top_25_traps(self):
-        self.assertEqual(len(TRAPS), 25)
+    def test_covers_at_least_the_prd_top_25(self):
+        self.assertGreaterEqual(len(TRAPS), 25)
 
     def test_ids_are_unique(self):
         ids = [trap.id for trap in TRAPS]
@@ -61,6 +61,100 @@ class ScanTest(unittest.TestCase):
 
     def test_get_trap_is_case_insensitive(self):
         self.assertEqual(get_trap("ocr-001").id, "OCR-001")
+
+
+def trap_ids(idea):
+    return {w.trap.id for w in scan(idea)}
+
+
+def escalated(idea):
+    return {w.trap.id for w in scan(idea) if w.explicitly_mentioned}
+
+
+class NegationTest(unittest.TestCase):
+    """Issue #1: rejecting a dead end must never count as choosing it."""
+
+    def test_negated_mentions_do_not_escalate(self):
+        for idea in (
+            "A handwriting app, and I will NOT use OpenCV",
+            "handwriting reader without OpenCV",
+            "handwriting app instead of Tesseract",
+            "a chat app, avoid polling",
+            "an e-commerce shop with no MongoDB",
+            "handwriting app, I don't want to use OpenCV",
+        ):
+            with self.subTest(idea=idea):
+                self.assertEqual(escalated(idea), set())
+
+    def test_negation_keeps_the_proactive_guard(self):
+        self.assertIn("OCR-001", trap_ids("A handwriting app, and I will NOT use OpenCV"))
+
+    def test_real_choices_still_escalate(self):
+        for idea in (
+            "Use OpenCV to read handwriting",
+            "an OpenCV-based handwriting reader",
+            "handwriting app, not sure, maybe OpenCV?",
+            "I have no idea how to use OpenCV for handwriting",
+            "read handwriting with OpenCV, not Tesseract",
+        ):
+            with self.subTest(idea=idea):
+                self.assertIn("OCR-001", escalated(idea))
+
+
+class ParaphraseTest(unittest.TestCase):
+    """Issues #2 and #3: the same problem phrased differently gets the same guard."""
+
+    def test_handwriting_phrasings_trigger_ocr_001(self):
+        for idea in (
+            "An app to transcribe doctor handwriting",
+            "Read doctor's prescriptions",
+            "Read scanned prescriptions from doctors",
+            "scanned prescriptions",
+            "letters written by hand",
+            "my grandma's cursive recipe cards",
+            "digitise handwritten forms",
+            "notes from doctors into a database",
+            "Turn photos of whiteboard notes into text",
+            "OCR my lecture notes",
+        ):
+            with self.subTest(idea=idea):
+                self.assertIn("OCR-001", trap_ids(idea))
+
+    def test_non_handwriting_ideas_do_not_trigger_ocr_001(self):
+        for idea in ("A pharmacy app to manage prescription refills", "A shared real-time whiteboard for teams"):
+            with self.subTest(idea=idea):
+                self.assertNotIn("OCR-001", trap_ids(idea))
+
+    def test_whiteboard_photo_is_not_collaborative_editing(self):
+        self.assertNotIn("RT-002", trap_ids("Turn photos of whiteboard notes into text"))
+
+    def test_collaborative_whiteboards_still_trigger_rt_002(self):
+        for idea in ("A shared real-time whiteboard for teams", "A whiteboard app we can draw on together"):
+            with self.subTest(idea=idea):
+                self.assertIn("RT-002", trap_ids(idea))
+
+
+class CoverageTest(unittest.TestCase):
+    """Issue #4: marketplace, location, payment and notification risks are detected."""
+
+    def test_service_marketplace_traps(self):
+        ids = trap_ids("An Uber for dog walkers")
+        for expected in ("GEO-001", "GEO-002", "PAY-001"):
+            self.assertIn(expected, ids)
+
+    def test_new_traps_fire_on_their_own_domains(self):
+        cases = {
+            "A live GPS tracker for delivery couriers": "GEO-001",
+            "Find coffee shops near me": "GEO-002",
+            "A subscription box site with checkout": "PAY-001",
+            "A mobile app that reminds users to take their meds": "PUSH-001",
+        }
+        for idea, expected in cases.items():
+            with self.subTest(idea=idea):
+                self.assertIn(expected, trap_ids(idea))
+
+    def test_storing_cards_escalates(self):
+        self.assertIn("PAY-001", escalated("A checkout that stores credit cards in our database"))
 
 
 class ReportSerialisationTest(unittest.TestCase):

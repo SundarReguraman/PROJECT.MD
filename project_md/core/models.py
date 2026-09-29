@@ -42,6 +42,9 @@ class Category(str, Enum):
     AI_ML = "ai_ml"
     SEARCH = "search"
     SCRAPING = "scraping"
+    GEOLOCATION = "geolocation"
+    PAYMENTS = "payments"
+    NOTIFICATIONS = "notifications"
 
 
 class Constraint(str, Enum):
@@ -113,8 +116,12 @@ class Trap:
         return _find_all(self.idea_patterns, text)
 
     def anti_pattern_matches(self, text: str) -> List[str]:
-        """Return the anti-pattern terms ``text`` explicitly mentions."""
-        return _find_all(self.anti_patterns, text)
+        """Return the anti-pattern terms ``text`` explicitly chooses.
+
+        Negated mentions ("I will NOT use OpenCV", "without Tesseract") are
+        ignored: rejecting a dead end must never count as choosing it.
+        """
+        return _find_all(self.anti_patterns, text, skip_negated=True)
 
 
 @dataclass(frozen=True)
@@ -271,12 +278,31 @@ class PreflightReport:
         return data
 
 
-def _find_all(patterns: Tuple[str, ...], text: str) -> List[str]:
+# A negator followed by at most three words, ending right where a match starts.
+# Words can't span punctuation, so "I'm not sure, maybe OpenCV" is not negated,
+# and the three-word limit keeps "no idea how to use OpenCV" as a real choice.
+_NEGATED_PREFIX = re.compile(
+    r"\b(?:not|never|no|nor|without|avoid(?:ing)?|instead of|rather than|stop using|"
+    r"(?:do|does|did|wo|would|should|ca|could|must)n['\u2019]?t)"
+    r"(?:\s+[\w'\u2019-]+){0,3}\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_negated(text: str, start: int) -> bool:
+    """Whether the match beginning at ``start`` sits inside a negation."""
+    return bool(_NEGATED_PREFIX.search(text[:start]))
+
+
+def _find_all(patterns: Tuple[str, ...], text: str, skip_negated: bool = False) -> List[str]:
     found: List[str] = []
     for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match and match.group(0) not in found:
-            found.append(match.group(0))
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            if skip_negated and is_negated(text, match.start()):
+                continue
+            if match.group(0) not in found:
+                found.append(match.group(0))
+            break
     return found
 
 

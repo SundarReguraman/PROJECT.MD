@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from project_md.core.knowledge_base import get_trap
+from project_md.core.knowledge_base import TRAPS, get_trap
 from project_md.core.models import DataModel, PreflightReport, Severity, Verdict
 
 VERDICT_BANNERS = {
@@ -10,6 +10,18 @@ VERDICT_BANNERS = {
     Verdict.REVIEW: "REVIEW: a human must resolve the items under *Needs review* before implementation.",
     Verdict.BLOCK: "BLOCK: the idea as described commits to a known dead end. Follow the mandated replacements below.",
 }
+
+
+
+def verdict_banner(report: PreflightReport) -> str:
+    if report.verdict is Verdict.PASS and not report.warnings:
+        # Nothing matched: say so, rather than implying the idea was checked and found safe.
+        return (
+            f"PASS: no known dead ends matched ({len(TRAPS)} traps checked). The stack below is a sensible "
+            "default, not a guarantee; unusual requirements may still need a human review."
+        )
+    return VERDICT_BANNERS[report.verdict]
+
 
 PYTHON_TYPES = {"uuid": "UUID", "str": "str", "int": "int", "float": "float", "bool": "bool", "datetime": "datetime"}
 TS_TYPES = {"uuid": "string", "str": "string", "int": "number", "float": "number", "bool": "boolean", "datetime": "string"}
@@ -39,7 +51,7 @@ class SpecGenerator:
             "",
             f"> **Idea:** {intent.idea}",
             "",
-            f"**Pre-flight verdict:** {VERDICT_BANNERS[report.verdict]}  ",
+            f"**Pre-flight verdict:** {verdict_banner(report)}  ",
             f"**Risk score:** {report.risk_score}/100",
             "",
             f"- Platforms: {', '.join(p.value for p in intent.platforms)}",

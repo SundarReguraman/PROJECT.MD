@@ -36,6 +36,9 @@ CATEGORY_ROLES: Dict[Category, str] = {
     Category.AI_ML: "AI / ML",
     Category.SEARCH: "Search",
     Category.SCRAPING: "Data collection",
+    Category.GEOLOCATION: "Location & maps",
+    Category.PAYMENTS: "Payments",
+    Category.NOTIFICATIONS: "Push notifications",
 }
 
 # Traps whose first recommendation is advice rather than a technology.
@@ -43,6 +46,8 @@ STACK_CHOICE_OVERRIDES: Dict[str, str] = {
     "QUEUE-001": "Background worker queue (RQ/Dramatiq on Python, BullMQ on Node)",
     "AI-003": "RAG pipeline: chunk, embed, retrieve top-k, then prompt",
     "SCRAPE-001": "Official API / JSON endpoints first, Playwright where a browser is required",
+    "GEO-001": "expo-location background tracking (distance-throttled) + WebSockets / Supabase Realtime",
+    "PAY-001": "Stripe (Checkout for payments, Connect Express for marketplace payouts)",
 }
 
 # (pattern, licence, why it matters). Matched against the idea and chosen stack.

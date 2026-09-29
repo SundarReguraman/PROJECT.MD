@@ -15,6 +15,7 @@ from typing import List, Optional, TextIO
 
 from project_md import __version__
 from project_md.agents.orchestrator import Orchestrator
+from project_md.core.knowledge_base import TRAPS
 from project_md.core.models import ContextTarget, Finding, PreflightReport, Severity, Verdict
 from project_md.exporters import EXPORTERS, render_all, write_files
 
@@ -155,7 +156,10 @@ class Printer:
     def verdict(self, report: PreflightReport) -> None:
         self.line()
         self.line(f"Risk score: {report.risk_score}/100")
-        self.line(f"Verdict:    {VERDICT_TEXT[report.verdict]}", BOLD + VERDICT_COLORS[report.verdict])
+        text = VERDICT_TEXT[report.verdict]
+        if report.verdict is Verdict.PASS and not report.warnings:
+            text = f"PASS    no known traps matched ({len(TRAPS)} checked); the stack is a default, not a guarantee"
+        self.line(f"Verdict:    {text}", BOLD + VERDICT_COLORS[report.verdict])
 
     def files(self, written, skipped) -> None:
         self.line()
