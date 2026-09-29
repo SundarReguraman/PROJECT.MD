@@ -14,7 +14,6 @@ from project_md.core.models import Category, Constraint, Platform, ProjectIntent
 
 CONSTRAINT_PATTERNS: Dict[Constraint, Tuple[str, ...]] = {
     Constraint.OFFLINE: (r"\boffline\b", r"\bno internet\b", r"\bwithout (?:an? )?internet\b", r"\bon[- ]device\b", r"\blocal[- ]first\b", r"\bair[- ]gapped\b"),
-    Constraint.LOW_BUDGET: (r"\bfree\b", r"\bcheap\w*\b", r"\blow[- ]cost\b", r"\bno (?:cloud )?costs?\b", r"\bbudget\b", r"\bstudents?\b", r"\bhackathon\b"),
     Constraint.LOW_LATENCY: (r"\bfast\b", r"\binstant\w*\b", r"\blow[- ]latency\b", r"\breal[- ]?time\b", r"\bunder \d+ ?(?:ms|milliseconds?|seconds?|s)\b", r"\b< ?\d+ ?(?:ms|s)\b"),
     Constraint.PRIVACY_SENSITIVE: (r"\bmedical\b", r"\bhealth\w*\b", r"\bpatients?\b", r"\bdoctors?'?s?\b", r"\bclinic\w*\b", r"\bhipaa\b", r"\btherap\w*\b", r"\bbank\w*\b", r"\bfinancial\b", r"\bchildren\b", r"\bkids\b", r"\bminors\b", r"\blegal\b", r"\bgdpr\b", r"\bpersonal data\b"),
     Constraint.HIGH_SCALE: (r"\bmillions?\b", r"\bat scale\b", r"\b(?:thousands|lots) of (?:concurrent )?users\b", r"\bviral\b", r"\bhigh[- ]traffic\b"),
