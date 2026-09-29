@@ -7,6 +7,8 @@
 - **Branch with the latest code:** `fix/issues-1-6` (this brief lives on `research/assistant-native-preflight`, branched from it)
 - **Your deliverable:** `docs/research/FINDINGS-assistant-native-preflight.md` (format in [§9](#9-deliverable-format))
 
+> **Update (2026-09-29): the owner has chosen a concrete design.** §4.6 describes a **five-agent pack** that runs on top of the user's AI assistant. It is the **primary design to evaluate**; §4.1–4.5 are the general rationale behind it. Decisions already made: **Claude Code is the first target**, and **installation works both globally and per project**. Implementation waits for your findings, so answer RQ10–RQ12 as well as RQ1–RQ9.
+
 ---
 
 ## 1. Rules for this research
@@ -164,6 +166,36 @@ We supply those three things, packaged in each assistant's native mechanism.
 - **R6: Differentiation.** "It's just a prompt": how is this better than community rule packs or spec-driven tools?
 - **R7: Catalogue staleness.** Replacements such as TrOCR or specific Stripe products change; the catalogue needs dated sources and review.
 
+### 4.6 The chosen design: a five-agent pack on top of the user's assistant
+
+**The idea in the owner's words:** download a pack once. Whenever you start something (the owner imagines `git init`, then describing an idea), **five specialist agents** use *your* AI coding assistant, and the model powering it, to do all the work: research the idea, find the best stack, and work out contracts, dependencies, security, reliability, robustness and scalability. The idea ends up fully specified, written as `PROJECT.md` plus the assistant's native context file (`CLAUDE.md`, Cursor rules, `AGENTS.md`...). The agents sit on top of Copilot, Claude Code, Cursor or Antigravity; PROJECT.MD ships no model of its own.
+
+**Proposed split (to be validated, not fixed):**
+
+| Agent | Job | Contributes to `PROJECT.md` |
+| :--- | :--- | :--- |
+| 1. **Researcher** | Understand the idea; find prior art and proven approaches; check every catalogue trap *by meaning* | Problem statement, prior art, dead ends (why + replacement) |
+| 2. **Stack & Dependencies** | Choose the stack; vet libraries (maintenance, licence, deprecation) | Stack table, dependency list with licences |
+| 3. **Architecture & Contracts** | Layers and boundaries; data models and API | Layers, forbidden imports, models, endpoints |
+| 4. **Reliability & Scale** | Failure modes, bottlenecks, behaviour at 10× load | Risks, retries/queues, scaling plan |
+| 5. **Security & Privacy** | Auth, secrets, regulated data, abuse | Threats, mitigations, compliance flags |
+
+- **An orchestrator command** (working name `/preflight <idea>`) fans out to the five agents, merges their results into one verdict (PASS / REVIEW / BLOCK) and writes the files. The user still types one sentence (rule 2).
+- **The trap catalogue (§3.2)** is the shared reference every agent must check against. **Rule 3** (why + replacement) applies to everything the agents emit.
+- **Claude Code first**, because it has native subagents (`.claude/agents/*.md`) and slash commands (`.claude/commands/*.md`, user-level under `~/.claude/`). *These locations are the owner's working assumption. Verify them in RQ2/RQ10.*
+- **Install both ways:**
+  - **globally once**, so the command works in every project;
+  - **per project** via `project-md init`, e.g. for teams.
+- **What happens to today's code:**
+  - the catalogue, exporters, tests and CLI stay (the CLI becomes the installer, still stdlib only);
+  - the regex detection and rule-based agents are retired, or kept as an offline fallback.
+
+**Specific uncertainties for this design:**
+- **U1: `git init` as the trigger.** The owner's working understanding: git's init template directory only populates `.git/`, not the working tree, and there is no post-init hook. So `git init` probably *cannot* install or trigger the pack. Verify this (RQ11).
+- **U2: Parallel subagents outside Claude Code.** Whether Copilot, Cursor and Antigravity support subagents or parallel agents, or whether the five must run in sequence in one conversation (RQ10).
+- **U3: The "research your idea" step needs web access.** Which assistants give their agents web search or fetch, and what happens without it (RQ10)?
+- **U4: Five specialists may not beat one well-prompted pre-flight** and will cost more time and tokens (RQ12).
+
 ---
 
 ## 5. Research questions
@@ -233,18 +265,47 @@ For **Claude Code, Cursor, Google Antigravity, GitHub Copilot (VS Code) and AGEN
 ### RQ9: Hybrid with Option 2 (optional AI mode)
 Option 2 would make the CLI call an LLM API directly (possible with Python's stdlib `urllib`, so no dependency, but an API key is required). Should Option 1 be the default and Option 2 a later add-on for CI/headless use? What would each cost the user?
 
+### RQ10: Five-agent pack feasibility per assistant
+For each of **Claude Code, Cursor, GitHub Copilot (VS Code) and Google Antigravity**, from primary docs and hands-on tests:
+- **Subagents / custom agents:** can a project or user define named specialist agents? File format and location? Can one command or agent invoke others? **In parallel?** Does each get its own context window?
+- **Orchestration:** how would `/preflight <idea>` be implemented natively (slash command, prompt file, workflow, custom mode)? Can it pass the idea to each agent and collect structured results?
+- **Tools available to the agents:** web search/fetch (needed by the Researcher), file write (needed to write `PROJECT.md`), and whether tools can be restricted per agent (e.g. the pre-flight agents read-only except the final writer).
+- **Fallback:** where subagents aren't supported, write the single-conversation sequential version and compare its quality.
+- **Output:** a matrix assistant × {subagents, parallel, per-agent tools, web access, orchestration mechanism, fallback needed?}, each cell with a source.
+
+### RQ11: Install and trigger
+- **Verify U1:** can `git init` (init templates, `init.templateDir`, hooks) put files into the working tree or trigger anything? Cite git's documentation.
+- **For each assistant:** where are **user-level (global)** vs **project-level** agents, commands and rules stored on macOS, Windows and Linux? Do global and project definitions merge, and which wins on a name clash?
+- **Evaluate beginner-friendly triggers:**
+  - global install plus `/preflight`;
+  - `project-md init`;
+  - a git alias;
+  - shell functions;
+  - an assistant plugin or marketplace entry, if any exist.
+  Rank them by steps a beginner must take and cross-platform reliability.
+- **What does updating the pack look like** when the catalogue changes?
+
+### RQ12: Do five specialists beat one?
+In Claude Code, run the RQ1 prompt set in **three arms**:
+- (a) **no pack** (baseline);
+- (b) **single-agent pack:** one pre-flight command with the full protocol and catalogue;
+- (c) **five-agent pack:** the §4.6 orchestrator plus five subagents.
+
+For each arm, record trap recall, false positives, correctness of the replacement, completeness of `PROJECT.md` (stack, contracts, security, reliability sections), **wall-clock time and token cost**. Recommend (b), (c), or a different split (e.g. three agents), with evidence.
+
 ---
 
 ## 6. Suggested method (adapt as needed)
 
 1. **Read** `docs/PRD.md`, `CLAUDE.md`, `README.md` and `project_md/core/knowledge_base.py` (about 30 minutes).
-2. **RQ2 first** (docs research): you need the native formats before you can build the RQ3 prototype.
+2. **RQ2, RQ10 and RQ11 first** (docs research): you need the native formats, subagent support and install locations before you can build the prototypes.
 3. **RQ1 baseline experiments.**
-4. **Build a minimal prototype pack by hand:**
+4. **Build minimal prototype packs by hand** in `docs/research/experiments/pack/`:
    - an index of all traps with one-line signals;
    - full detail for about 10 traps;
-   - the protocol text.
-5. **RQ3 experiments** with the pack.
+   - the protocol text;
+   - for Claude Code, both a **single-agent** version and a **five-agent** version (orchestrator command plus five subagent definitions).
+5. **RQ3 and RQ12 experiments** with the packs.
 6. **RQ7 and RQ8 desk research.**
 7. **Draft the RQ4, RQ5, RQ6 and RQ9 recommendations** from what you learned.
 8. **Write the findings document.**
@@ -275,11 +336,16 @@ Where you can't run an assistant, write the exact prompts and procedure so the o
 
 Create `docs/research/FINDINGS-assistant-native-preflight.md` with:
 
-1. **TL;DR (≤ 10 lines):** go / no-go / go-with-changes on Option 1, and the single most important finding.
-2. **Answers to RQ1–RQ9:** finding, evidence (links + access dates), confidence, implications.
-3. **Baseline vs pack results table** (RQ1/RQ3), with raw transcripts linked from `docs/research/experiments/`.
+1. **TL;DR (≤ 10 lines):** go / no-go / go-with-changes on the **five-agent pack (§4.6)**, the recommended number of agents, and the single most important finding.
+2. **Answers to RQ1–RQ12:** finding, evidence (links + access dates), confidence, implications.
+3. **Results table for baseline vs single-agent vs five-agent** (RQ1/RQ3/RQ12), with raw transcripts linked from `docs/research/experiments/`.
 4. **Native mechanism matrix** (RQ2): assistant × {always-on file, on-demand command, frontmatter/scoping, size limits, hooks}, each cell with a source link. Explicitly list which of our current exporter outputs are wrong or outdated.
-5. **Recommended architecture:** components, file layout per assistant, protocol text draft, what stays deterministic, and a migration path from the current code (what to keep, change or delete).
+5. **Recommended architecture:**
+   - components and file layout per assistant (starting with Claude Code);
+   - the install/trigger flow (RQ11);
+   - draft agent definitions and orchestrator text, with the prototype files linked;
+   - what stays deterministic;
+   - a migration path from the current code (what to keep, change or delete).
 6. **Catalogue review** (RQ7): a per-trap verdict (keep / update / drop, with source), plus the proposed new traps with evidence.
 7. **Evaluation plan** (RQ6): corpus sources, rubric, metrics, and how it runs.
 8. **Competitive landscape** (RQ8): a table and the differentiation statement.
