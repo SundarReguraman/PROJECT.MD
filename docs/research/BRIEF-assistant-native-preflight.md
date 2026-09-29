@@ -11,15 +11,76 @@
 
 ---
 
+## 0. Course corrections: read before continuing
+
+> **Added 2026-09-29 after the owner reviewed the work in progress** in `docs/research/experiments/` (the files as of 16:55). These points **override** anything you've already built. Fix them before producing more.
+
+**C1. Follow the method order in §6; it is not optional.**
+- **Stop building prototypes** until two things are done:
+  - the docs research for **RQ2, RQ10 and RQ11**, with cited sources;
+  - the **RQ1 baseline** (no pack), with transcripts saved under `docs/research/experiments/baseline/`.
+- RQ1 is the highest-priority question. If assistants already push back, the whole pack design changes.
+
+**C2. Confirm the Claude Code formats you've assumed, with primary-doc links.** Specifically:
+- Can a **skill** (`.claude/skills/<name>/SKILL.md`) be invoked explicitly as `/preflight <idea>`, or does an explicit command need `.claude/commands/<name>.md`? How are arguments passed to each?
+- What syntax does the subagent frontmatter `tools` field take (comma-separated string vs YAML list)? Is `model: inherit` valid?
+- Can a skill or command **launch subagents in parallel** and collect their outputs?
+- Record the answers in the RQ2/RQ10 matrix. Rebuild the prototypes to match.
+
+**C3. The five-agent prototype must be complete.**
+- The orchestrator calls `arch-contracts`, `reliability-scale` and `security-privacy`, but only `researcher` and `stack-deps` exist.
+- Create all five before running any five-agent experiment. Each needs a clear scope, which catalogue traps it owns, and an output format the orchestrator can merge.
+
+**C4. Every arm must use the same catalogue, or RQ12 is invalid.**
+- **Currently:**
+  - the single-agent skill inlines **15** traps;
+  - the five-agent `researcher` inlines **8**;
+  - neither reads `catalogue_index.md` / `catalogue_detail.md`.
+- **Required:**
+  - **all 29 traps** live in the shared catalogue files only;
+  - both packs **load them by reference** (e.g. "Read `catalogue_index.md`; open `catalogue_detail.md` for any trap that may apply");
+  - no inline trap subsets in agent or skill prompts.
+- Otherwise the experiment measures catalogue size, not one agent vs five.
+
+**C5. Use PROJECT.MD's verdict semantics, not new ones.** The rules in the prototypes ("any CRITICAL trap → BLOCK"; "REVIEW = minor warnings, proceed") reintroduce a bug fixed in PR #11 (issue #1). The product's contract, from `project_md/agents/orchestrator.py`, is:
+
+| Verdict | When | Behaviour |
+| :--- | :--- | :--- |
+| **BLOCK** | The user **explicitly chooses** a dead end ("use OpenCV to read handwriting", "store card numbers") | Refuse the anti-pattern, explain why, mandate the replacement |
+| **REVIEW** | A **human decision** is needed that the assistant must not make alone: regulated data (health, finance, children), a copyleft licence, conflicting requirements | Proceed only after the user decides that point |
+| **PASS** | Everything else, **including latent traps** the idea is merely *prone to* (e.g. "an app to read doctor handwriting") | The replacement is mandated in `PROJECT.md` as a guarded warning; the idea is not blocked |
+
+- **Rejecting a dead end** ("I will NOT use OpenCV") is never a BLOCK.
+- **When nothing in the catalogue matched,** PASS must say so ("no known traps matched"), not imply the idea was cleared.
+- Update `protocol.md` and both skills to match.
+
+**C6. Catalogue changes need sources, and must not name specific model versions.**
+- **Every change to a trap** (new replacement, licence claim, API name) needs a **source link and access date**, or an **UNVERIFIED** label. There are currently no source links in the pack files.
+- **Don't name specific LLM/VLM versions** in the catalogue ("GPT-4o", "Claude 3.5 Sonnet" and "Gemini 2.0 Flash" are already outdated, and any version name will date quickly). Write "a current vision-language model via API (e.g. from Anthropic, Google or OpenAI)" instead.
+- **Verify or mark UNVERIFIED** at least these claims:
+  - "Stripe Connect Accounts v2";
+  - "YOLOX is Apache-2.0";
+  - "GOT-OCR 2.0 / PaddleOCR-VL";
+  - "NextAuth v4 → Auth.js v5";
+  - "TensorFlow Lite → LiteRT".
+- **GEO-002:** make sure the replacement doesn't recommend something the trap lists as an anti-pattern (haversine in application code over all rows).
+
+**C7. Housekeeping.**
+- Delete `docs/research/experiments/test.txt`.
+- Never commit `.DS_Store` files.
+
+---
+
 ## 1. Rules for this research
 
 1. **Never push to `main`. Never merge or close PRs or issues.** Work only on the `research/assistant-native-preflight` branch, or leave files uncommitted for the owner to review.
-2. **Do not modify** `project_md/`, `tests/`, `CLAUDE.md`, `README.md` or `docs/PRD.md`. You may add files under `docs/research/`, plus throwaway experiment scripts under `docs/research/experiments/`.
-3. **Cite everything.** Every factual claim about a tool, format, model behaviour, licence or statistic needs a source URL and the date you accessed it. Many of these products change monthly. Anything from memory rather than a source must be labelled **UNVERIFIED**.
-4. **Separate what you observed from what you infer.** Label each finding **Verified** (you tested it or read primary documentation), **Reported** (secondary source), or **Assumed**.
-5. **Prefer primary sources:** official docs, changelogs, specs, licence files and your own experiments over blog posts.
-6. **Record negative results.** If an assistant ignores a rule file, or already pushes back on a trap without help, that is a key finding, not a failure.
-7. **If a question can't be answered with available access,** say so and propose how it could be answered.
+2. **Follow the method order in §6 and the course corrections in §0.**
+3. **Do not modify** `project_md/`, `tests/`, `CLAUDE.md`, `README.md` or `docs/PRD.md`. You may add files under `docs/research/`, plus throwaway experiment scripts under `docs/research/experiments/`.
+4. **Cite everything.** Every factual claim about a tool, format, model behaviour, licence or statistic needs a source URL and the date you accessed it. Many of these products change monthly. Anything from memory rather than a source must be labelled **UNVERIFIED**.
+5. **Separate what you observed from what you infer.** Label each finding **Verified** (you tested it or read primary documentation), **Reported** (secondary source), or **Assumed**.
+6. **Prefer primary sources:** official docs, changelogs, specs, licence files and your own experiments over blog posts.
+7. **Record negative results.** If an assistant ignores a rule file, or already pushes back on a trap without help, that is a key finding, not a failure.
+8. **If a question can't be answered with available access,** say so and propose how it could be answered.
 
 ---
 
@@ -319,6 +380,7 @@ Where you can't run an assistant, write the exact prompts and procedure so the o
 - **Rule 1 (stdlib only, no `pip install`) holds for anything PROJECT.MD ships.** If you recommend breaking it, say so explicitly and justify it.
 - **Rule 2 (one sentence from the user) holds.** A single confirmation from the assistant is acceptable; a questionnaire is not.
 - **Rule 3 (plain-English *why* + mandated replacement) holds** for every trap, in every format.
+- **Verdict semantics (§0, C5) hold:** BLOCK only for an explicitly chosen dead end, REVIEW only for a human decision, and latent traps are guarded warnings under PASS.
 - **Beginners are the audience.** Anything that needs understanding git hooks, API keys or config files is a cost to call out.
 - **Cross-platform:** macOS, Windows, Linux.
 
