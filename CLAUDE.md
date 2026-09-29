@@ -1,7 +1,7 @@
+# CLAUDE.md — PROJECT.MD Development Guidelines
+
 ## Canonical Specification
 - Full Product Requirements & Architecture Blueprint: `docs/PRD.md`
-
-# CLAUDE.md — PROJECT.MD Development Guidelines
 
 ## Project Vision & Mission
 PROJECT.MD is a zero-prerequisite cross-platform architecture tool for complete beginners, busy vibe coders, and hackathon teams.
