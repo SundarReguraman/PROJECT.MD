@@ -24,6 +24,15 @@ class GuidelinesFileTest(unittest.TestCase):
         self.assertTrue(first_line.startswith("# CLAUDE.md"), first_line)
 
 
+class PackagingTest(unittest.TestCase):
+    def test_pyproject_license_is_an_spdx_string_matching_licence_file(self):
+        # The TOML-table form (license = { file = ... }) is deprecated by setuptools; removal after 2027-02-18.
+        pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        licence = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8").split()[0]  # e.g. "MIT"
+        self.assertRegex(pyproject, r'(?m)^license = "%s"$' % re.escape(licence))
+        self.assertRegex(pyproject, r'setuptools>=(7[7-9]|[89]\d)')
+
+
 class ReadmeTest(unittest.TestCase):
     """Issue #6: the README must describe this product and stay in sync with it."""
 

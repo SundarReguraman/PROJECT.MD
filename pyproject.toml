@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]  # 77+ for the SPDX `license` string (PEP 639)
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "project-md"
 version = "0.1.0"
 description = "Pre-flight architecture engine: turns a plain-English idea into a vetted stack and native AI context files."
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
 requires-python = ">=3.9"
 # Non-negotiable: standard library only. Do not add runtime dependencies.
 dependencies = []
