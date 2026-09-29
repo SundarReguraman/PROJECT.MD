@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "project-md"
+version = "0.1.0"
+description = "Pre-flight architecture engine: turns a plain-English idea into a vetted stack and native AI context files."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+# Non-negotiable: standard library only. Do not add runtime dependencies.
+dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Software Development :: Code Generators",
+]
+
+[tool.setuptools.packages.find]
+include = ["project_md*"]
