@@ -53,8 +53,12 @@ def infer_intent(idea: str, warnings: List[TrapWarning] = None) -> ProjectIntent
     constraints = [c for c, patterns in CONSTRAINT_PATTERNS.items() if _any_match(patterns, idea)]
     platforms = [p for p, patterns in PLATFORM_PATTERNS.items() if _any_match(patterns, idea)]
     if not platforms:
-        # "An app to ..." with no platform named: the web reaches every device.
-        platforms = [Platform.WEB]
+        if any(w.trap.id == "GEO-001" for w in warnings):
+            # Live tracking of people only works from the phone in their pocket.
+            platforms = [Platform.MOBILE]
+        else:
+            # "An app to ..." with no platform named: the web reaches every device.
+            platforms = [Platform.WEB]
 
     language = next((name for name, pattern in LANGUAGE_PATTERNS if re.search(pattern, idea, re.IGNORECASE)), "")
 

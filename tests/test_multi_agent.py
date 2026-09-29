@@ -135,6 +135,16 @@ class AgentOutputTest(unittest.TestCase):
         self.assertEqual(report.endpoints, [])
         self.assertIsNone(report.stack.get("Backend API"))
 
+    def test_service_marketplace_gets_booking_contracts_and_mobile(self):
+        report = Orchestrator().run_sync("An Uber for dog walkers").report
+        names = {m.name for m in report.data_models}
+        self.assertTrue({"ProviderProfile", "Booking", "LocationPing", "Payment"} <= names)
+        self.assertNotIn("Item", names)
+        self.assertIsNotNone(report.stack.get("Mobile app"))
+        self.assertIn("Stripe", report.stack.get("Payments").choice)
+        money = [f for m in report.data_models for f in m.fields if "cents" in f.name]
+        self.assertTrue(money and all(f.type == "int" for f in money))
+
     def test_license_risk_is_flagged(self):
         report = Orchestrator().run_sync("A web app to detect defects with YOLOv8").report
         self.assertTrue(any("AGPL" in f.title for f in report.findings))

@@ -138,6 +138,14 @@ class CliBehaviourTest(unittest.TestCase):
         self.assertEqual(code, cli.EXIT_ERROR)
         self.assertIn("unknown target", out)
 
+    def test_zero_match_pass_does_not_claim_clearance(self):
+        # Issue #4: a PASS with nothing matched must not read as "checked and safe".
+        _, out = run_main(["A personal recipe organizer", "--no-write", "--no-color"])
+        self.assertIn("no known traps matched", out)
+        self.assertNotIn("cleared for implementation", out)
+        report = Orchestrator().run_sync("A personal recipe organizer").report
+        self.assertIn("no known dead ends matched", render_all(report)["PROJECT.md"])
+
     def test_no_write_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_main([HANDWRITING, "--out", tmp, "--no-write"])

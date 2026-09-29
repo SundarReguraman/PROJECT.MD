@@ -7,12 +7,14 @@ from typing import List
 from project_md.agents.base_agent import BaseAgent
 from project_md.core.models import Category, Constraint, Finding, Severity, Trap
 
-OWNED_CATEGORIES = frozenset({Category.REALTIME, Category.CONCURRENCY, Category.QUEUE, Category.DATABASE})
+OWNED_CATEGORIES = frozenset(
+    {Category.REALTIME, Category.CONCURRENCY, Category.QUEUE, Category.DATABASE, Category.GEOLOCATION, Category.NOTIFICATIONS}
+)
 # Database traps that belong to other specialists.
 NOT_OWNED = frozenset({"DB-003", "DB-004"})
 
 HEAVY_INFERENCE = frozenset({Category.OCR, Category.COMPUTER_VISION, Category.AI_ML})
-NEEDS_SERVER = frozenset({Category.REALTIME, Category.AUTH})
+NEEDS_SERVER = frozenset({Category.REALTIME, Category.AUTH, Category.GEOLOCATION, Category.PAYMENTS, Category.NOTIFICATIONS})
 
 # Distinct problem domains above which an MVP is likely over-scoped.
 SCOPE_LIMIT = 4

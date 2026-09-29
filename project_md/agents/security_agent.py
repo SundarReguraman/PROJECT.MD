@@ -8,14 +8,16 @@ from project_md.agents.base_agent import BaseAgent
 from project_md.core.models import Category, Constraint, Finding, Platform, Severity, Trap
 
 # Domains that usually mean calling a paid third-party API with a secret key.
-EXTERNAL_API = frozenset({Category.AI_ML, Category.OCR, Category.COMPUTER_VISION, Category.AUTH})
+EXTERNAL_API = frozenset(
+    {Category.AI_ML, Category.OCR, Category.COMPUTER_VISION, Category.AUTH, Category.PAYMENTS, Category.GEOLOCATION}
+)
 
 
 class SecurityAgent(BaseAgent):
     name = "security"
 
     def owns(self, trap: Trap) -> bool:
-        return trap.category is Category.AUTH
+        return trap.category in (Category.AUTH, Category.PAYMENTS)
 
     async def evaluate(self, idea: str, domain_context: dict) -> List[Finding]:
         intent = self.intent(domain_context)

@@ -1,4 +1,4 @@
-"""The trap knowledge base: the top 25 architectural dead ends beginners walk into.
+"""The trap knowledge base: the architectural dead ends beginners walk into most.
 
 Each trap explains WHY the naive approach fails in plain English and mandates
 the modern replacement (CLAUDE.md rule 3). Patterns are case-insensitive
@@ -15,6 +15,13 @@ from typing import Dict, List, Tuple
 
 from project_md.core.models import Category, Severity, Trap, TrapWarning
 
+# Building blocks for OCR-001: a surface people write on by hand, and turning it into text.
+# "Uber for X"-style service marketplaces: live location, bookings, payments, payouts.
+SERVICE_MARKETPLACE = r"\b(?:uber|lyft|doordash|deliveroo|taskrabbit|rover|fiverr|airbnb) for\b|\bon[- ]demand\b|\btwo[- ]sided\b"
+
+HANDWRITTEN_SURFACE = r"\b(?:whiteboards?|chalkboards?|blackboards?|notebooks?|sticky notes?|post-?its?|lecture notes|class notes|scanned notes)\b"
+TO_TEXT = r"(?:\b(?:into|to) (?:digital |editable |searchable )?text\b|\btranscri\w*|\bdigiti[sz]\w*|\bocr\b|\bextract\w* (?:the )?text\b)"
+
 TRAPS: Tuple[Trap, ...] = (
     # ── OCR ──────────────────────────────────────────────────────────────
     Trap(
@@ -22,7 +29,18 @@ TRAPS: Tuple[Trap, ...] = (
         category=Category.OCR,
         severity=Severity.CRITICAL,
         title="Handwriting recognition with OpenCV or basic Tesseract",
-        idea_patterns=(r"hand[- ]?writ\w*", r"\bcursive\b", r"doctor'?s? (?:notes?|prescriptions?)", r"\bhandwritten\b"),
+        idea_patterns=(
+            r"hand[- ]?writ\w*", r"\bcursive\b", r"\bwritten by hand\b", r"\bscribbl\w*",
+            # Doctors' notes/prescriptions in either word order.
+            r"\bdoctor\w*['\u2019]?s?\b.*\b(?:notes?|prescriptions?|writing)\b",
+            r"\b(?:notes?|prescriptions?)\b.*\bdoctors?\b",
+            # Reading/digitising prescriptions (not merely managing refills).
+            r"\b(?:read|scan|digiti[sz]|transcrib|photo|ocr|extract)\w*\b.*\bprescriptions?\b",
+            r"\bprescriptions?\b.*\b(?:read|scan|digiti[sz]|transcrib|ocr|extract)\w*",
+            # Surfaces people write on by hand, turned into text.
+            HANDWRITTEN_SURFACE + r".*" + TO_TEXT,
+            TO_TEXT + r".*" + HANDWRITTEN_SURFACE,
+        ),
         anti_patterns=(r"\bopen ?cv\b", r"\bcv2\b", r"\btesseract\b", r"\bcontours?\b", r"\bthreshold\w*"),
         trap="OpenCV contours/thresholding or stock Tesseract to read handwriting",
         why_it_fails=(
@@ -211,7 +229,7 @@ TRAPS: Tuple[Trap, ...] = (
         category=Category.DATABASE,
         severity=Severity.WARNING,
         title="MongoDB/NoSQL for highly relational data",
-        idea_patterns=(r"\be-?commerce\b", r"\bshop\b", r"\bstore front\b", r"\bbookings?\b", r"\breservations?\b", r"\binventory\b", r"\b(?:orders?|payments?|invoices?)\b", r"\bmarketplace\b"),
+        idea_patterns=(SERVICE_MARKETPLACE, r"\be-?commerce\b", r"\bshop\b", r"\bstore front\b", r"\bbookings?\b", r"\breservations?\b", r"\binventory\b", r"\b(?:orders?|payments?|invoices?)\b", r"\bmarketplace\b"),
         anti_patterns=(r"\bmongo\w*\b", r"\bnosql\b", r"\bfirestore\b", r"\bdynamo\w*\b"),
         trap="A document database for orders, users, products and payments",
         why_it_fails=(
@@ -359,7 +377,10 @@ TRAPS: Tuple[Trap, ...] = (
         category=Category.REALTIME,
         severity=Severity.CRITICAL,
         title="Collaborative editing with last-write-wins",
-        idea_patterns=(r"\bcollaborat\w*\b", r"\bgoogle docs\b", r"\bshared (?:docs?|documents?|whiteboard|canvas|notes?|editor)\b", r"\bmulti-?user edit\w*\b", r"\bco-?edit\w*\b", r"\bwhiteboard\b"),
+        idea_patterns=(r"\bcollaborat\w*\b", r"\bgoogle docs\b", r"\bshared (?:docs?|documents?|whiteboard|canvas|notes?|editor)\b", r"\bmulti-?user edit\w*\b", r"\bco-?edit\w*\b",
+                       # A whiteboard is only a sync problem when people draw on it together.
+                       r"\b(?:shared|collaborative|multiplayer|real[- ]?time|team)\b.*\bwhiteboards?\b",
+                       r"\bwhiteboards?\b.*\b(?:together|collaborat\w*|multiplayer|real[- ]?time|shared)\b"),
         anti_patterns=(r"\blast[- ]write[- ]wins\b", r"\bsave the whole (?:doc|document)\b", r"\boverwrite\w*\b", r"\block\w* the (?:doc|document|file)\b"),
         trap="Each client saving the whole document, newest save wins",
         why_it_fails=(
@@ -481,6 +502,103 @@ TRAPS: Tuple[Trap, ...] = (
             "Check for an official API or the site's own JSON endpoints first (browser dev tools, Network tab)",
             "Playwright for pages that genuinely need a browser",
             "Respect robots.txt and terms of service",
+        ),
+    ),
+    # ── Geolocation ──────────────────────────────────────────────────────
+    Trap(
+        id="GEO-001",
+        category=Category.GEOLOCATION,
+        severity=Severity.WARNING,
+        title="Live location tracking by polling GPS over HTTP",
+        idea_patterns=(
+            SERVICE_MARKETPLACE,
+            r"\b(?:live|real[- ]?time)\b.*\b(?:location|gps|tracking|map)\b",
+            r"\btrack\w*\b.*\b(?:location|drivers?|walkers?|couriers?|riders?|deliver\w*|vehicles?|fleet|runs?)\b",
+            r"\bgps\b", r"\bride[- ]?(?:share|sharing|hailing)\b",
+        ),
+        anti_patterns=(r"\bpoll\w*\b", r"\bsetInterval\b", r"\bevery (?:\d+ )?seconds?\b", r"\bsend\w* (?:the )?(?:location|gps) every\b"),
+        trap="Phones POSTing their GPS position every few seconds while other clients poll for it",
+        why_it_fails=(
+            "Fixed-interval GPS uploads drain the battery, flood your server with near-identical rows, and still "
+            "show positions seconds late. iOS and Android also suspend apps in the background, so a plain timer "
+            "simply stops firing the moment the walker or driver locks their phone."
+        ),
+        recommended=(
+            "Platform background-location APIs (expo-location + TaskManager), throttled by distance (e.g. every 25 m), not time",
+            "Stream positions to watchers over WebSockets or a managed realtime service (Supabase Realtime, Ably, Firebase)",
+            "Mapbox or Google Maps SDK for display; store only the latest position plus a sampled history",
+        ),
+    ),
+    Trap(
+        id="GEO-002",
+        category=Category.GEOLOCATION,
+        severity=Severity.WARNING,
+        title="Nearby search done in application code or with flat lat/lng math",
+        idea_patterns=(
+            SERVICE_MARKETPLACE,
+            r"\bnear(?:by| me)\b", r"\bwithin \d+ ?(?:km|kilomet\w*|miles?|m)\b", r"\bclosest\b",
+            r"\b(?:find|match)\w*\b.*\b(?:local|nearby|closest|near)\b",
+        ),
+        anti_patterns=(r"\bhaversine\b", r"\bpythagor\w*", r"\bloop\w* (?:over|through) (?:all|every)\b", r"\bsqrt\b"),
+        trap="Loading every record and computing distances in app code, or treating lat/lng as flat x/y",
+        why_it_fails=(
+            "Scanning every walker or venue on each search slows down linearly as you grow. Treating latitude "
+            "and longitude as a flat grid is also wrong: a degree of longitude shrinks towards the poles, so "
+            "'nearest' results are simply incorrect outside the equator."
+        ),
+        recommended=(
+            "PostGIS: ST_DWithin on a geography column with a GiST index (inside the Postgres you already use)",
+            "SQLite apps: SpatiaLite, or a geohash prefix filter before exact distance",
+            "For place search, Mapbox or Google Places instead of your own POI database",
+        ),
+    ),
+    # ── Payments ─────────────────────────────────────────────────────────
+    Trap(
+        id="PAY-001",
+        category=Category.PAYMENTS,
+        severity=Severity.CRITICAL,
+        title="Handling card data or marketplace payouts yourself",
+        idea_patterns=(
+            SERVICE_MARKETPLACE,
+            r"\bpay(?:s|ing|ments?|outs?)?\b", r"\bcheckout\b", r"\bsubscriptions?\b", r"\bmarketplace\b",
+            r"\bcharg\w*\b.*\b(?:customers?|users?|cards?|clients?)\b", r"\b(?:sell|buy)\w*\b.*\bonline\b",
+        ),
+        anti_patterns=(
+            r"\bstor\w* (?:the |their )?(?:credit )?cards?\b", r"\bcard (?:numbers?|details)\b", r"\bcvv\b",
+            r"\bpay (?:them|out|walkers|drivers|sellers|providers) (?:manually|by hand)\b", r"\bmanual payouts?\b",
+        ),
+        trap="Collecting card numbers in your own forms/database, or paying out sellers by hand",
+        why_it_fails=(
+            "Storing card data puts you under PCI DSS: audits, liability, and one leak can end the project. "
+            "Marketplace payouts add identity checks (KYC), tax reporting and holding funds between buyer and "
+            "seller. Building that by hand takes months and is legally risky."
+        ),
+        recommended=(
+            "Stripe Checkout or Payment Element, so card data never touches your server",
+            "Stripe Connect (Express accounts) for marketplace payouts, onboarding and KYC",
+            "Store only Stripe IDs and integer-cent amounts; update order state from Stripe webhooks",
+        ),
+    ),
+    # ── Notifications ────────────────────────────────────────────────────
+    Trap(
+        id="PUSH-001",
+        category=Category.NOTIFICATIONS,
+        severity=Severity.WARNING,
+        title="Polling from the app to deliver notifications",
+        idea_patterns=(
+            r"\bnotif\w*", r"\bpush (?:alerts?|messages?)\b",
+            r"\b(?:remind|alert)\w*\b.*\b(?:users?|phones?|customers?|owners?|walkers?|drivers?|people)\b",
+        ),
+        anti_patterns=(r"\bpoll\w*\b", r"\bsetInterval\b", r"\bcheck\w* (?:for (?:new )?\w+ )?every\b", r"\bbackground (?:loop|timer)\b"),
+        trap="The app checking the server on a timer for new alerts",
+        why_it_fails=(
+            "Mobile operating systems suspend background apps, so a polling timer never fires when the app is "
+            "closed, which is exactly when a notification matters. When it does run, it drains the battery."
+        ),
+        recommended=(
+            "Expo Notifications (delivers via Apple APNs and Google FCM)",
+            "Web Push with a service worker for browser apps",
+            "Managed: OneSignal or Firebase Cloud Messaging",
         ),
     ),
 )

@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple
 
 from project_md.agents.base_agent import BaseAgent
 from project_md.core.intent import needs_backend
+from project_md.core.knowledge_base import SERVICE_MARKETPLACE
 from project_md.core.models import (
     ApiEndpoint,
     Category,
@@ -94,6 +95,32 @@ TEMPLATES: Dict[str, Tuple[Tuple[DataModel, ...], Tuple[ApiEndpoint, ...]]] = {
             ApiEndpoint("GET", "/orders/{id}", "Order status."),
         ),
     ),
+    "services": (
+        (
+            DataModel("ProviderProfile", "A person offering the service (e.g. the walker/driver). Links to a User.", (
+                F("id", "uuid"), F("user_id", "uuid"), F("bio", "str", optional=True), F("rate_cents", "int"),
+                F("currency", "str"), F("stripe_account_id", "str", optional=True), F("is_available", "bool"),
+            )),
+            DataModel("Booking", "A customer booking a provider. Money is integer minor units (cents).", (
+                F("id", "uuid"), F("customer_id", "uuid"), F("provider_id", "uuid"), F("status", "str"),
+                F("scheduled_at", "datetime"), F("price_cents", "int"), F("currency", "str"), F("created_at", "datetime"),
+            )),
+            DataModel("LocationPing", "A sampled provider position during an active booking.", (
+                F("id", "uuid"), F("booking_id", "uuid"), F("lat", "float"), F("lng", "float"), F("recorded_at", "datetime"),
+            )),
+            DataModel("Payment", "Mirror of a Stripe PaymentIntent; Stripe is the source of truth.", (
+                F("id", "uuid"), F("booking_id", "uuid"), F("amount_cents", "int"), F("currency", "str"),
+                F("stripe_payment_intent_id", "str"), F("status", "str"),
+            )),
+        ),
+        (
+            ApiEndpoint("GET", "/providers?near=lat,lng", "Available providers near a point (PostGIS ST_DWithin)."),
+            ApiEndpoint("POST", "/bookings", "Request a booking; creates a Stripe PaymentIntent."),
+            ApiEndpoint("PATCH", "/bookings/{id}", "Provider accepts, starts or completes a booking."),
+            ApiEndpoint("WS", "/ws/bookings/{id}/location", "Live provider location for the customer during a booking."),
+            ApiEndpoint("POST", "/webhooks/stripe", "Payment and payout events; the only place payment status changes."),
+        ),
+    ),
     "assistant": (
         (
             DataModel("Conversation", "A thread with the AI assistant.", (
@@ -123,7 +150,7 @@ TEMPLATES: Dict[str, Tuple[Tuple[DataModel, ...], Tuple[ApiEndpoint, ...]]] = {
     ),
 }
 
-COMMERCE_TRAPS = frozenset({"DB-002", "DB-003"})
+COMMERCE_TRAPS = frozenset({"DB-002", "DB-003", "PAY-001"})
 
 
 class ContractAgent(BaseAgent):
@@ -139,7 +166,7 @@ class ContractAgent(BaseAgent):
         domains = self._domains(idea, intent.categories, trap_ids)
         models: List[DataModel] = []
         endpoints: List[ApiEndpoint] = []
-        needs_accounts = Category.AUTH in intent.categories or any(d in domains for d in ("chat", "collab", "commerce", "assistant"))
+        needs_accounts = Category.AUTH in intent.categories or any(d in domains for d in ("chat", "collab", "commerce", "services", "assistant"))
         if needs_accounts:
             models.append(USER)
         for domain in domains:
@@ -183,7 +210,9 @@ class ContractAgent(BaseAgent):
             domains.append("collab")
         elif Category.REALTIME in categories and re.search(r"\bchat\w*\b|\bmessag\w*\b", idea, re.IGNORECASE):
             domains.append("chat")
-        if trap_ids & COMMERCE_TRAPS:
+        if re.search(SERVICE_MARKETPLACE, idea, re.IGNORECASE):
+            domains.append("services")  # Bookings of people, not purchases of products.
+        elif trap_ids & COMMERCE_TRAPS:
             domains.append("commerce")
         if Category.AI_ML in categories and re.search(r"\bchat ?bot\b|\bassistant\b|\bchat with\b|\bask questions?\b", idea, re.IGNORECASE):
             domains.append("assistant")
