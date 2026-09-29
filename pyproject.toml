@@ -18,5 +18,8 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
 ]
 
+[project.scripts]
+project-md = "project_md.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["project_md*"]
